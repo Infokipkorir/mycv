@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CV Builder</title>
+<style>
+  :root{
+    --ink:#1a1a1a; --ink-soft:#666; --line:#e3e3e3; --accent:#2563eb; --bg:#f7f7f8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:'Helvetica Neue',Arial,sans-serif; background:var(--bg); color:var(--ink);}
+  .layout{display:flex; min-height:100vh;}
+  .form-pane{width:46%; padding:32px; overflow-y:auto; max-height:100vh;}
+  .preview-pane{width:54%; background:#e9e9ee; display:flex; align-items:flex-start; justify-content:center; padding:32px; overflow-y:auto; max-height:100vh;}
+  h1{font-size:1.4rem; margin:0 0 4px;}
+  .sub{color:var(--ink-soft); font-size:.85rem; margin-bottom:24px;}
+  fieldset{border:none; padding:0; margin:0 0 22px;}
+  legend{font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); font-weight:700; margin-bottom:10px;}
+  label{display:block; font-size:.8rem; font-weight:600; margin:10px 0 4px;}
+  input,textarea,select{
+    width:100%; padding:.55rem .7rem; border:1.5px solid var(--line); border-radius:8px;
+    font-family:inherit; font-size:.87rem; outline:none; background:#fff;
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--accent);}
+  textarea{resize:vertical; min-height:60px;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .template-row{display:flex; gap:10px; margin-bottom:22px;}
+  .template-card{
+    flex:1; border:2px solid var(--line); border-radius:10px; padding:10px; cursor:pointer; text-align:center;
+    font-size:.8rem; font-weight:600; background:#fff; transition:border-color .15s ease;
+  }
+  .template-card.active{border-color:var(--accent); color:var(--accent);}
+  .entry-block{border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; background:#fff;}
+  .entry-block-head{display:flex; justify-content:space-between; align-items:center;}
+  .remove-btn{border:none; background:none; color:#c33; font-size:.78rem; cursor:pointer; font-weight:600;}
+  .add-btn{
+    border:1.5px dashed var(--line); background:#fff; border-radius:8px; padding:.5rem;
+    width:100%; font-size:.82rem; font-weight:600; color:var(--ink-soft); cursor:pointer; margin-top:4px;
+  }
+  .add-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .skills-input-row{display:flex; gap:8px;}
+  .skill-tag{
+    display:inline-flex; align-items:center; gap:6px; background:#eef2ff; color:var(--accent);
+    padding:4px 10px; border-radius:999px; font-size:.78rem; font-weight:600; margin:4px 6px 0 0;
+  }
+  .skill-tag button{border:none; background:none; color:var(--accent); cursor:pointer; font-size:.85rem; line-height:1;}
+  .generate-btn{
+    width:100%; padding:.85rem; border:none; border-radius:10px; background:var(--accent); color:#fff;
+    font-size:.95rem; font-weight:700; cursor:pointer; margin-top:10px;
+  }
+  .generate-btn:hover{filter:brightness(1.08);}
+  .hint{font-size:.76rem; color:var(--ink-soft); margin-top:8px; line-height:1.5;}
+  iframe{width:100%; max-width:560px; height:85vh; border:1px solid var(--line); background:#fff; box-shadow:0 8px 30px rgba(0,0,0,.08);}
+
+  /* Hide everything except the CV iframe when printing the OUTER page.
+     (The actual print happens inside the iframe itself via its own
+     print() call, but this is a safety net if someone Ctrl+P's the
+     whole page instead of using the button.) */
+  @media print{
+    .form-pane, .preview-pane{display:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <div class="form-pane">
+    <h1>Build your CV</h1>
+    <div class="sub">Fill in your details, pick a style, download a polished PDF — entirely in your browser, nothing uploaded anywhere.</div>
+
+    <fieldset>
+      <legend>Template</legend>
+      <div class="template-row" id="templateRow">
+        <div class="template-card active" data-template="classic">Classic</div>
+        <div class="template-card" data-template="modern">Modern</div>
+        <div class="template-card" data-template="minimal">Minimal</div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Basic Info</legend>
+      <label>Full Name</label>
+      <input type="text" id="fullName" placeholder="Jane Wanjiru">
+      <label>Title / Headline</label>
+      <input type="text" id="title" placeholder="Frontend Developer">
+      <div class="row2">
+        <div><label>Email</label><input type="email" id="email" placeholder="jane@example.com"></div>
+        <div><label>Phone</label><input type="text" id="phone" placeholder="+254 7xx xxx xxx"></div>
+      </div>
+      <label>Location</label>
+      <input type="text" id="location" placeholder="Nairobi, Kenya">
+      <label>Profile Summary</label>
+      <textarea id="summary" placeholder="A short 2-3 sentence overview of your experience and strengths."></textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>Experience</legend>
+      <div id="experienceList"></div>
+      <button type="button" class="add-btn" id="addExperience">+ Add work experience</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Education</legend>
+      <div id="educationList"></div>
+      <button type="button" class="add-btn" id="addEducation">+ Add education</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Skills</legend>
+      <div class="skills-input-row">
+        <input type="text" id="skillInput" placeholder="Type a skill and press Enter">
+      </div>
+      <div id="skillTags"></div>
+    </fieldset>
+
+    <button class="generate-btn" id="generateBtn">Download PDF</button>
+    <div class="hint">Opens your browser's print dialog — choose "Save as PDF" as the destination. This uses your browser's own PDF engine, so nothing is uploaded to a server.</div>
+  </div>
+
+  <div class="preview-pane">
+    <iframe id="previewFrame" title="CV preview"></iframe>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // =====================================================================
+  // Shared helpers (ported from templates/helpers.js)
+  // =====================================================================
+  function esc(str){
+    if (str === undefined || str === null) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function dateRange(item){
+    var end = item.end && item.end.trim() ? esc(item.end) : 'Present';
+    return esc(item.start) + ' – ' + end;
+  }
+  function bulletList(bullets){
+    if (!Array.isArray(bullets) || !bullets.length) return '';
+    return '<ul>' + bullets.map(function(b){ return '<li>' + esc(b) + '</li>'; }).join('') + '</ul>';
+  }
+
+  // =====================================================================
+  // Templates (ported from templates/classic.js, modern.js, minimal.js)
+  // Each @page rule below controls the actual printed PDF page size and
+  // margins — this is what preferCSSPageSize did server-side, now it's
+  // just native browser print behavior.
+  // =====================================================================
+  var TEMPLATES = {
+    classic: function(cv){
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
+        + '@page { size: A4; margin: 22mm 20mm; } * { box-sizing: border-box; }'
+        + 'body { font-family: Georgia, "Times New Roman", serif; color: #222; font-size: 11pt; line-height: 1.5; margin:0; }'
+        + 'h1 { font-size: 22pt; margin: 0 0 2px 0; letter-spacing: 0.3px; }'
+        + '.title { font-size: 12pt; color: #555; margin: 0 0 10px 0; }'
+        + '.contact { font-size: 9.5pt; color: #555; margin-bottom: 18px; } .contact span { margin-right: 14px; }'
+        + 'h2 { font-size: 11.5pt; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1.5px solid #222; padding-bottom: 3px; margin: 18px 0 8px 0; }'
+        + '.entry { margin-bottom: 12px; } .entry-head { display: flex; justify-content: space-between; font-weight: bold; }'
+        + '.entry-sub { font-style: italic; color: #444; font-size: 10pt; margin-bottom: 3px; }'
+        + 'ul { margin: 4px 0 0 18px; padding: 0; } li { margin-bottom: 2px; }'
+        + '.skills { display: flex; flex-wrap: wrap; gap: 6px 14px; } .skills span { font-size: 10pt; }'
+        + '.skills span:not(:last-child)::after { content: "•"; margin-left: 14px; color: #999; }'
+        + '</style></head><body>'
+        + '<h1>' + esc(cv.fullName) + '</h1>'
+        + (cv.title ? '<div class="title">' + esc(cv.title) + '</div>' : '')
+        + '<div class="contact">'
+          + (cv.email ? '<span>' + esc(cv.email) + '</span>' : '')
+          + (cv.phone ? '<span>' + esc(cv.phone) + '</span>' : '')
+          + (cv.location ? '<span>' + esc(cv.location) + '</span>' : '')
+        + '</div>'
+        + (cv.summary ? '<h2>Profile</h2><p>' + esc(cv.summary) + '</p>' : '')
+        + ((cv.experience || []).length ? '<h2>Experience</h2>' + (cv.experience || []).map(function(job){
+            return '<div class="entry"><div class="entry-head"><span>' + esc(job.role) + (job.company ? ' — ' + esc(job.company) : '') + '</span><span>' + dateRange(job) + '</span></div>' + bulletList(job.bullets) + '</div>';
+          }).join('') : '')
+        + ((cv.education || []).length ? '<h2>Education</h2>' + (cv.education || []).map(function(ed){
+            return '<div class="entry"><div class="entry-head"><span>' + esc(ed.degree) + (ed.school ? ' — ' + esc(ed.school) : '') + '</span><span>' + dateRange(ed) + '</span></div></div>';
+          }).join('') : '')
+        + ((cv.skills || []).length ? '<h2>Skills</h2><div class="skills">' + (cv.skills || []).map(function(s){ return '<span>' + esc(s) + '</span>'; }).join('') + '</div>' : '')
+        + '</body></html>';
+    },
+
+    modern: function(cv){
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
+        + '@page { size: A4; margin: 0; } * { box-sizing: border-box; }'
+        + 'body { font-family: "Helvetica Neue", Arial, sans-serif; color: #222; font-size: 10.5pt; margin: 0; }'
+        + '.page { display: flex; min-height: 297mm; }'
+        + '.sidebar { width: 34%; background: #1f2937; color: #fff; padding: 26mm 14mm 14mm 14mm; }'
+        + '.main { width: 66%; padding: 26mm 16mm 14mm 16mm; }'
+        + '.name { font-size: 19pt; font-weight: 700; margin: 0 0 2px 0; line-height: 1.2; }'
+        + '.role { font-size: 10.5pt; color: #9ca3af; margin-bottom: 20px; }'
+        + '.sb-h { font-size: 9.5pt; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin: 18px 0 8px 0; } .sb-h:first-of-type { margin-top: 0; }'
+        + '.contact-item { font-size: 9.5pt; margin-bottom: 6px; word-break: break-word; }'
+        + '.skill-pill { display: inline-block; background: #374151; color: #e5e7eb; font-size: 9pt; padding: 3px 9px; border-radius: 10px; margin: 0 5px 5px 0; }'
+        + 'h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; color: #1f2937; border-bottom: 2px solid #1f2937; padding-bottom: 4px; margin: 0 0 10px 0; } h2:not(:first-child) { margin-top: 20px; }'
+        + '.entry { margin-bottom: 13px; } .entry-head { display: flex; justify-content: space-between; font-weight: 700; font-size: 10.5pt; }'
+        + '.entry-sub { color: #6b7280; font-size: 9.5pt; margin-bottom: 3px; }'
+        + 'ul { margin: 4px 0 0 16px; padding: 0; } li { margin-bottom: 2px; } p { margin: 0; }'
+        + '</style></head><body><div class="page">'
+        + '<div class="sidebar">'
+          + '<div class="name">' + esc(cv.fullName) + '</div>'
+          + (cv.title ? '<div class="role">' + esc(cv.title) + '</div>' : '')
+          + '<div class="sb-h">Contact</div>'
+          + (cv.email ? '<div class="contact-item">' + esc(cv.email) + '</div>' : '')
+          + (cv.phone ? '<div class="contact-item">' + esc(cv.phone) + '</div>' : '')
+          + (cv.location ? '<div class="contact-item">' + esc(cv.location) + '</div>' : '')
+          + ((cv.skills || []).length ? '<div class="sb-h">Skills</div><div>' + (cv.skills || []).map(function(s){ return '<span class="skill-pill">' + esc(s) + '</span>'; }).join('') + '</div>' : '')
+        + '</div>'
+        + '<div class="main">'
+          + (cv.summary ? '<h2>Profile</h2><p>' + esc(cv.summary) + '</p>' : '')
+          + ((cv.experience || []).length ? '<h2>Experience</h2>' + (cv.experience || []).map(function(job){
+              return '<div class="entry"><div class="entry-head"><span>' + esc(job.role) + '</span><span>' + dateRange(job) + '</span></div><div class="entry-sub">' + esc(job.company) + '</div>' + bulletList(job.bullets) + '</div>';
+            }).join('') : '')
+          + ((cv.education || []).length ? '<h2>Education</h2>' + (cv.education || []).map(function(ed){
+              return '<div class="entry"><div class="entry-head"><span>' + esc(ed.degree) + '</span><span>' + dateRange(ed) + '</span></div><div class="entry-sub">' + esc(ed.school) + '</div></div>';
+            }).join('') : '')
+        + '</div></div></body></html>';
+    },
+
+    minimal: function(cv){
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
+        + '@page { size: A4; margin: 24mm 22mm; } * { box-sizing: border-box; }'
+        + 'body { font-family: "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; font-size: 10.5pt; line-height: 1.6; margin: 0; }'
+        + 'h1 { font-size: 20pt; font-weight: 300; letter-spacing: 0.5px; margin: 0 0 3px 0; }'
+        + '.title { font-size: 11pt; color: #666; margin-bottom: 10px; font-weight: 300; }'
+        + '.contact { font-size: 9.5pt; color: #777; margin-bottom: 26px; } .contact span:not(:last-child)::after { content: "  /  "; color: #ccc; }'
+        + 'h2 { font-size: 9.5pt; text-transform: uppercase; letter-spacing: 2px; color: #999; font-weight: 600; margin: 22px 0 10px 0; }'
+        + '.entry { margin-bottom: 14px; } .entry-head { display: flex; justify-content: space-between; font-weight: 600; }'
+        + '.entry-sub { color: #777; font-size: 9.5pt; margin-bottom: 3px; }'
+        + 'ul { margin: 5px 0 0 16px; padding: 0; } li { margin-bottom: 3px; color: #333; }'
+        + '.skills-line { color: #333; } p { margin: 0; color: #333; }'
+        + '</style></head><body>'
+        + '<h1>' + esc(cv.fullName) + '</h1>'
+        + (cv.title ? '<div class="title">' + esc(cv.title) + '</div>' : '')
+        + '<div class="contact">'
+          + (cv.email ? '<span>' + esc(cv.email) + '</span>' : '')
+          + (cv.phone ? '<span>' + esc(cv.phone) + '</span>' : '')
+          + (cv.location ? '<span>' + esc(cv.location) + '</span>' : '')
+        + '</div>'
+        + (cv.summary ? '<h2>Profile</h2><p>' + esc(cv.summary) + '</p>' : '')
+        + ((cv.experience || []).length ? '<h2>Experience</h2>' + (cv.experience || []).map(function(job){
+            return '<div class="entry"><div class="entry-head"><span>' + esc(job.role) + '</span><span>' + dateRange(job) + '</span></div><div class="entry-sub">' + esc(job.company) + '</div>' + bulletList(job.bullets) + '</div>';
+          }).join('') : '')
+        + ((cv.education || []).length ? '<h2>Education</h2>' + (cv.education || []).map(function(ed){
+            return '<div class="entry"><div class="entry-head"><span>' + esc(ed.degree) + '</span><span>' + dateRange(ed) + '</span></div><div class="entry-sub">' + esc(ed.school) + '</div></div>';
+          }).join('') : '')
+        + ((cv.skills || []).length ? '<h2>Skills</h2><div class="skills-line">' + (cv.skills || []).map(esc).join('  ·  ') + '</div>' : '')
+        + '</body></html>';
+    }
+  };
+
+  // =====================================================================
+  // Form state + wiring (same logic as the previous version — only the
+  // "generate" step changed, from a fetch() to a local print() call)
+  // =====================================================================
+  var state = { template: 'classic', experience: [], education: [], skills: [] };
+
+  var el = {
+    fullName: document.getElementById('fullName'),
+    title: document.getElementById('title'),
+    email: document.getElementById('email'),
+    phone: document.getElementById('phone'),
+    location: document.getElementById('location'),
+    summary: document.getElementById('summary'),
+    experienceList: document.getElementById('experienceList'),
+    educationList: document.getElementById('educationList'),
+    skillInput: document.getElementById('skillInput'),
+    skillTags: document.getElementById('skillTags'),
+    generateBtn: document.getElementById('generateBtn'),
+    previewFrame: document.getElementById('previewFrame'),
+    templateRow: document.getElementById('templateRow'),
+  };
+
+  function collectCv(){
+    return {
+      fullName: el.fullName.value.trim(),
+      title: el.title.value.trim(),
+      email: el.email.value.trim(),
+      phone: el.phone.value.trim(),
+      location: el.location.value.trim(),
+      summary: el.summary.value.trim(),
+      experience: state.experience,
+      education: state.education,
+      skills: state.skills,
+      template: state.template
+    };
+  }
+
+  el.templateRow.addEventListener('click', function(e){
+    var card = e.target.closest('.template-card');
+    if (!card) return;
+    document.querySelectorAll('.template-card').forEach(function(c){ c.classList.remove('active'); });
+    card.classList.add('active');
+    state.template = card.getAttribute('data-template');
+    updatePreview();
+  });
+
+  function addExperienceRow(){
+    var idx = state.experience.length;
+    state.experience.push({ role:'', company:'', start:'', end:'', bullets:[] });
+    var block = document.createElement('div');
+    block.className = 'entry-block';
+    block.innerHTML =
+      '<div class="entry-block-head"><span></span><button type="button" class="remove-btn">Remove</button></div>' +
+      '<label>Role</label><input type="text" data-f="role" placeholder="Software Engineer">' +
+      '<div class="row2"><div><label>Company</label><input type="text" data-f="company" placeholder="Acme Ltd"></div>' +
+      '<div><label>Location</label><input type="text" data-f="loc" placeholder="Nairobi"></div></div>' +
+      '<div class="row2"><div><label>Start</label><input type="text" data-f="start" placeholder="Jan 2023"></div>' +
+      '<div><label>End (blank = Present)</label><input type="text" data-f="end" placeholder="Present"></div></div>' +
+      '<label>Highlights (one per line)</label><textarea data-f="bullets" placeholder="Led a team of 4 engineers&#10;Shipped X feature reducing load time by 30%"></textarea>';
+
+    block.querySelectorAll('input,textarea').forEach(function(input){
+      input.addEventListener('input', function(){
+        var field = input.getAttribute('data-f');
+        if (field === 'bullets'){
+          state.experience[idx].bullets = input.value.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+        } else {
+          state.experience[idx][field] = input.value;
+        }
+        updatePreview();
+      });
+    });
+    block.querySelector('.remove-btn').addEventListener('click', function(){
+      var i = Array.prototype.indexOf.call(el.experienceList.children, block);
+      state.experience.splice(i, 1);
+      block.remove();
+      updatePreview();
+    });
+    el.experienceList.appendChild(block);
+  }
+
+  function addEducationRow(){
+    var idx = state.education.length;
+    state.education.push({ degree:'', school:'', start:'', end:'' });
+    var block = document.createElement('div');
+    block.className = 'entry-block';
+    block.innerHTML =
+      '<div class="entry-block-head"><span></span><button type="button" class="remove-btn">Remove</button></div>' +
+      '<label>Degree / Qualification</label><input type="text" data-f="degree" placeholder="BSc Computer Science">' +
+      '<label>School</label><input type="text" data-f="school" placeholder="University of Nairobi">' +
+      '<div class="row2"><div><label>Start</label><input type="text" data-f="start" placeholder="2018"></div>' +
+      '<div><label>End</label><input type="text" data-f="end" placeholder="2022"></div></div>';
+
+    block.querySelectorAll('input').forEach(function(input){
+      input.addEventListener('input', function(){
+        state.education[idx][input.getAttribute('data-f')] = input.value;
+        updatePreview();
+      });
+    });
+    block.querySelector('.remove-btn').addEventListener('click', function(){
+      var i = Array.prototype.indexOf.call(el.educationList.children, block);
+      state.education.splice(i, 1);
+      block.remove();
+      updatePreview();
+    });
+    el.educationList.appendChild(block);
+  }
+
+  document.getElementById('addExperience').addEventListener('click', addExperienceRow);
+  document.getElementById('addEducation').addEventListener('click', addEducationRow);
+  addExperienceRow();
+  addEducationRow();
+
+  function renderSkills(){
+    el.skillTags.innerHTML = '';
+    state.skills.forEach(function(skill, i){
+      var tag = document.createElement('span');
+      tag.className = 'skill-tag';
+      tag.innerHTML = '<span></span><button type="button">×</button>';
+      tag.querySelector('span').textContent = skill;
+      tag.querySelector('button').addEventListener('click', function(){
+        state.skills.splice(i, 1);
+        renderSkills();
+        updatePreview();
+      });
+      el.skillTags.appendChild(tag);
+    });
+  }
+  el.skillInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && el.skillInput.value.trim()){
+      e.preventDefault();
+      state.skills.push(el.skillInput.value.trim());
+      el.skillInput.value = '';
+      renderSkills();
+      updatePreview();
+    }
+  });
+
+  [el.fullName, el.title, el.email, el.phone, el.location, el.summary].forEach(function(input){
+    input.addEventListener('input', updatePreview);
+  });
+
+  function updatePreview(){
+    var cv = collectCv();
+    var renderFn = TEMPLATES[cv.template] || TEMPLATES.classic;
+    el.previewFrame.srcdoc = renderFn(cv);
+  }
+
+  // ---------- Generate PDF: browser's native print, no server involved ----------
+  el.generateBtn.addEventListener('click', function(){
+    var cv = collectCv();
+    if (!cv.fullName){
+      alert('Please enter your full name first.');
+      return;
+    }
+    // Printing the iframe's own window uses that iframe's @page CSS
+    // (size/margins) rather than the outer page's — this is what makes
+    // each template control its own PDF layout correctly.
+    var frameWindow = el.previewFrame.contentWindow;
+    if (frameWindow && frameWindow.print){
+      frameWindow.focus();
+      frameWindow.print();
+    } else {
+      window.print();
+    }
+  });
+
+  updatePreview();
+})();
+</script>
+</body>
+</html>
